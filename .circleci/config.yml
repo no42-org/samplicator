@@ -1,0 +1,45 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: buildpack-deps:eoan
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build
+          command: |
+            ./autogen.sh
+            ./configure
+            make
+      - persist_to_workspace:
+          root: ~/
+          paths:
+            - project
+  oci-image:
+    docker:
+      - image: docker:19.03.0-git
+    steps:
+      - attach_workspace:
+          at: ~/
+      - setup_remote_docker
+      - run:
+          name: Create OCI
+          command: |
+            docker build -t samplicator .
+      - run: 
+          name: Save OCI
+          command: |
+            docker image save samplicator -o samplicator.oci
+      - store_artifacts:
+          path: ./samplicator.oci
+
+workflows:
+  build:
+    jobs:
+      - build
+      - oci-image:
+          requires:
+            - build
